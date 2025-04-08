@@ -75,6 +75,66 @@ def load_data():
                 "nifty_change_percent": 0.0346,
                 "banknifty": 48497.5,
                 "banknifty_change_percent": -0.2677
+            },
+            "2025-03-10": {
+                "cash": {
+                    "fii": {
+                        "buy_sell_difference": -485.41,
+                        "buy": 9924.83,
+                        "sell": 10410.24,
+                        "net_action": "SELL",
+                        "net_view": "BEARISH",
+                        "net_view_strength": "Mild"
+                    },
+                    "dii": {
+                        "buy_sell_difference": 263.51,
+                        "buy": 9591.29,
+                        "sell": 9327.78,
+                        "net_action": "BUY",
+                        "net_view": "BULLISH",
+                        "net_view_strength": "Mild"
+                    }
+                },
+                "future": {
+                    "fii": {
+                        "quantity-wise": {
+                            "net_oi": -3321,
+                            "net_action": "SELL",
+                            "net_view": "BEARISH",
+                            "net_view_strength": "Medium"
+                        },
+                        "amount-wise": {
+                            "net_oi": -501.72,
+                            "net_view": "BEARISH"
+                        }
+                    },
+                    "dii": {
+                        "quantity-wise": {
+                            "net_oi": -393,
+                            "net_action": "SELL",
+                            "net_view": "BEARISH",
+                            "net_view_strength": "Mild"
+                        }
+                    }
+                },
+                "option": {
+                    "fii": {
+                        "overall_net_oi": -139072,
+                        "overall_net_oi_change_action": "SELL",
+                        "overall_net_oi_change_view": "BEARISH",
+                        "overall_net_oi_change_view_strength": "Mild"
+                    },
+                    "dii": {
+                        "overall_net_oi": -12034,
+                        "overall_net_oi_change_action": "SELL",
+                        "overall_net_oi_change_view": "BEARISH",
+                        "overall_net_oi_change_view_strength": "Mild"
+                    }
+                },
+                "nifty": 22460.3,
+                "nifty_change_percent": -0.4088,
+                "banknifty": 48216.8,
+                "banknifty_change_percent": -0.5788
             }
         }
     }
@@ -174,7 +234,7 @@ def process_data(data):
     
     df = pd.DataFrame(records)
     df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values('date')
+    df = df.sort_values('date').reset_index(drop=True)
     
     return df
 
@@ -188,9 +248,9 @@ def main():
     raw_data = load_data()
     df = process_data(raw_data)
     
-    # Date range selector
-    min_date = df['date'].min()
-    max_date = df['date'].max()
+    # Date range selector - ensure we have datetime.date objects for comparison
+    min_date = df['date'].min().date()
+    max_date = df['date'].max().date()
     
     col1, col2 = st.columns(2)
     with col1:
@@ -198,9 +258,11 @@ def main():
     with col2:
         end_date = st.date_input("End date", max_date, min_value=min_date, max_value=max_date)
     
+    # Convert selected dates to datetime64[ns] for comparison with DataFrame
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
     
+    # Filter the DataFrame
     filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
     
     # Overview metrics with existence checks
@@ -208,7 +270,7 @@ def main():
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        if 'fii_cash_net' in filtered_df.columns:
+        if 'fii_cash_net' in filtered_df.columns and len(filtered_df) > 0:
             latest_fii_net = filtered_df['fii_cash_net'].iloc[-1]
             trend = "↑" if latest_fii_net > 0 else "↓"
             col1.metric("Latest FII Net (Cash)", f"{latest_fii_net:,.2f} Cr", trend)
@@ -216,7 +278,7 @@ def main():
             col1.metric("Latest FII Net (Cash)", "N/A")
     
     with col2:
-        if 'dii_cash_net' in filtered_df.columns:
+        if 'dii_cash_net' in filtered_df.columns and len(filtered_df) > 0:
             latest_dii_net = filtered_df['dii_cash_net'].iloc[-1]
             trend = "↑" if latest_dii_net > 0 else "↓"
             col2.metric("Latest DII Net (Cash)", f"{latest_dii_net:,.2f} Cr", trend)
@@ -224,7 +286,7 @@ def main():
             col2.metric("Latest DII Net (Cash)", "N/A")
     
     with col3:
-        if 'nifty' in filtered_df.columns:
+        if 'nifty' in filtered_df.columns and len(filtered_df) > 0:
             latest_nifty = filtered_df['nifty'].iloc[-1]
             nifty_change = filtered_df['nifty_change_percent'].iloc[-1]
             col3.metric("Nifty 50", f"{latest_nifty:,.2f}", f"{nifty_change:.2f}%")
@@ -232,7 +294,7 @@ def main():
             col3.metric("Nifty 50", "N/A")
     
     with col4:
-        if 'banknifty' in filtered_df.columns:
+        if 'banknifty' in filtered_df.columns and len(filtered_df) > 0:
             latest_banknifty = filtered_df['banknifty'].iloc[-1]
             banknifty_change = filtered_df['banknifty_change_percent'].iloc[-1]
             col4.metric("Bank Nifty", f"{latest_banknifty:,.2f}", f"{banknifty_change:.2f}%")
@@ -242,7 +304,7 @@ def main():
     # Cash Market Analysis with existence checks
     st.subheader("Cash Market Activity")
     
-    if all(col in filtered_df.columns for col in ['fii_cash_buy', 'fii_cash_sell', 'fii_cash_net']):
+    if all(col in filtered_df.columns for col in ['fii_cash_buy', 'fii_cash_sell', 'fii_cash_net']) and len(filtered_df) > 0:
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=filtered_df['date'],
@@ -282,7 +344,7 @@ def main():
     col1, col2 = st.columns(2)
     
     with col1:
-        if all(col in filtered_df.columns for col in ['fii_cash_net', 'dii_cash_net']):
+        if all(col in filtered_df.columns for col in ['fii_cash_net', 'dii_cash_net']) and len(filtered_df) > 0:
             fig = px.line(filtered_df, x='date', y=['fii_cash_net', 'dii_cash_net'],
                          title='FII vs DII Net Investment (₹ Cr)')
             st.plotly_chart(fig, use_container_width=True)
@@ -328,7 +390,7 @@ def main():
     tab1, tab2, tab3 = st.tabs(["Futures (Quantity)", "Futures (Amount)", "Options"])
     
     with tab1:
-        if all(col in filtered_df.columns for col in ['fii_future_net_oi', 'dii_future_net_oi']):
+        if all(col in filtered_df.columns for col in ['fii_future_net_oi', 'dii_future_net_oi']) and len(filtered_df) > 0:
             fig = go.Figure()
             fig.add_trace(go.Bar(
                 x=filtered_df['date'],
@@ -353,7 +415,7 @@ def main():
             st.warning("Futures quantity data not available")
     
     with tab2:
-        if 'fii_future_net_oi_amt' in filtered_df.columns:
+        if 'fii_future_net_oi_amt' in filtered_df.columns and len(filtered_df) > 0:
             fig = px.line(filtered_df, x='date', y='fii_future_net_oi_amt',
                          title='FII Futures Net OI (Amount in ₹ Cr)')
             st.plotly_chart(fig, use_container_width=True)
@@ -361,7 +423,7 @@ def main():
             st.warning("Amount-wise futures data not available")
     
     with tab3:
-        if all(col in filtered_df.columns for col in ['fii_option_overall_net_oi', 'dii_option_overall_net_oi']):
+        if all(col in filtered_df.columns for col in ['fii_option_overall_net_oi', 'dii_option_overall_net_oi']) and len(filtered_df) > 0:
             fig = go.Figure()
             fig.add_trace(go.Bar(
                 x=filtered_df['date'],
@@ -388,7 +450,7 @@ def main():
     # Market Correlation Analysis with existence checks
     st.subheader("FII Activity vs Market Performance")
     
-    if all(col in filtered_df.columns for col in ['fii_cash_net', 'nifty']):
+    if all(col in filtered_df.columns for col in ['fii_cash_net', 'nifty']) and len(filtered_df) > 0:
         fig = go.Figure()
         
         # Add FII net cash as bars
