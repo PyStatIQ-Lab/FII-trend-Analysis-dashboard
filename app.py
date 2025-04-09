@@ -3,147 +3,36 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
+import requests
+import json
 
-# Load data function with proper error handling
-@st.cache_data
+# Configuration
+API_URL = "https://oxide.sensibull.com/v1/compute/cache/fii_dii_daily"
+CACHE_EXPIRY_DAYS = 1  # Refresh cache every day
+
+# Load data function with caching
+@st.cache_data(ttl=timedelta(days=CACHE_EXPIRY_DAYS).clear()
 def load_data():
-    # Sample data structure that matches the processing logic
-    data = {
-        "year_month": "2025-April",
-        "key_list": [
-            "2024-October", "2024-November", "2024-December", 
-            "2025-January", "2025-February", "2025-March", "2025-April"
-        ],
-        "data": {
-            "2025-03-07": {
-                "cash": {
-                    "fii": {
-                        "buy_sell_difference": -2035.1,
-                        "buy": 8635.45,
-                        "sell": 10670.55,
-                        "net_action": "SELL",
-                        "net_view": "BEARISH",
-                        "net_view_strength": "Mild"
-                    },
-                    "dii": {
-                        "buy_sell_difference": 2320.36,
-                        "buy": 10452.93,
-                        "sell": 8132.57,
-                        "net_action": "BUY",
-                        "net_view": "BULLISH",
-                        "net_view_strength": "Mild"
-                    }
-                },
-                "future": {
-                    "fii": {
-                        "quantity-wise": {
-                            "net_oi": -1803,
-                            "net_action": "SELL",
-                            "net_view": "BEARISH",
-                            "net_view_strength": "Medium"
-                        },
-                        "amount-wise": {
-                            "net_oi": -277.64,
-                            "net_view": "BEARISH"
-                        }
-                    },
-                    "dii": {
-                        "quantity-wise": {
-                            "net_oi": -1556,
-                            "net_action": "SELL",
-                            "net_view": "BEARISH",
-                            "net_view_strength": "Mild"
-                        }
-                    }
-                },
-                "option": {
-                    "fii": {
-                        "overall_net_oi": -134442,
-                        "overall_net_oi_change_action": "SELL",
-                        "overall_net_oi_change_view": "BEARISH",
-                        "overall_net_oi_change_view_strength": "Mild"
-                    },
-                    "dii": {
-                        "overall_net_oi": -7223,
-                        "overall_net_oi_change_action": "",
-                        "overall_net_oi_change_view": "",
-                        "overall_net_oi_change_view_strength": "Mild"
-                    }
-                },
-                "nifty": 22552.5,
-                "nifty_change_percent": 0.0346,
-                "banknifty": 48497.5,
-                "banknifty_change_percent": -0.2677
-            },
-            "2025-03-10": {
-                "cash": {
-                    "fii": {
-                        "buy_sell_difference": -485.41,
-                        "buy": 9924.83,
-                        "sell": 10410.24,
-                        "net_action": "SELL",
-                        "net_view": "BEARISH",
-                        "net_view_strength": "Mild"
-                    },
-                    "dii": {
-                        "buy_sell_difference": 263.51,
-                        "buy": 9591.29,
-                        "sell": 9327.78,
-                        "net_action": "BUY",
-                        "net_view": "BULLISH",
-                        "net_view_strength": "Mild"
-                    }
-                },
-                "future": {
-                    "fii": {
-                        "quantity-wise": {
-                            "net_oi": -3321,
-                            "net_action": "SELL",
-                            "net_view": "BEARISH",
-                            "net_view_strength": "Medium"
-                        },
-                        "amount-wise": {
-                            "net_oi": -501.72,
-                            "net_view": "BEARISH"
-                        }
-                    },
-                    "dii": {
-                        "quantity-wise": {
-                            "net_oi": -393,
-                            "net_action": "SELL",
-                            "net_view": "BEARISH",
-                            "net_view_strength": "Mild"
-                        }
-                    }
-                },
-                "option": {
-                    "fii": {
-                        "overall_net_oi": -139072,
-                        "overall_net_oi_change_action": "SELL",
-                        "overall_net_oi_change_view": "BEARISH",
-                        "overall_net_oi_change_view_strength": "Mild"
-                    },
-                    "dii": {
-                        "overall_net_oi": -12034,
-                        "overall_net_oi_change_action": "SELL",
-                        "overall_net_oi_change_view": "BEARISH",
-                        "overall_net_oi_change_view_strength": "Mild"
-                    }
-                },
-                "nifty": 22460.3,
-                "nifty_change_percent": -0.4088,
-                "banknifty": 48216.8,
-                "banknifty_change_percent": -0.5788
-            }
-        }
-    }
-    return data
+    try:
+        response = requests.get(API_URL)
+        response.raise_for_status()  # Raise exception for bad status codes
+        data = response.json()
+        
+        # Add current date to the data for reference
+        data['last_updated'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return data
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching data from API: {e}")
+        return None
 
-def process_data(data):
+def process_data(raw_data):
+    if not raw_data or 'data' not in raw_data:
+        return pd.DataFrame()
+    
     records = []
     
-    for date, daily_data in data['data'].items():
+    for date, daily_data in raw_data['data'].items():
         record = {
             'date': date,
             'nifty': daily_data.get('nifty', None),
@@ -152,7 +41,7 @@ def process_data(data):
             'banknifty_change_percent': daily_data.get('banknifty_change_percent', None)
         }
         
-        # Cash market data with existence checks
+        # Cash market data
         if 'cash' in daily_data:
             cash = daily_data['cash']
             if 'fii' in cash:
@@ -177,7 +66,7 @@ def process_data(data):
                     'dii_cash_view_strength': dii_cash.get('net_view_strength', None)
                 })
         
-        # Futures data with existence checks
+        # Futures data
         if 'future' in daily_data:
             future = daily_data['future']
             if 'fii' in future:
@@ -209,7 +98,7 @@ def process_data(data):
                         'dii_future_view_strength': qty.get('net_view_strength', None)
                     })
         
-        # Options data with existence checks
+        # Options data
         if 'option' in daily_data:
             option = daily_data['option']
             if 'fii' in option:
@@ -238,17 +127,77 @@ def process_data(data):
     
     return df
 
+def show_historical_trends(df, metric, title, color):
+    """Show historical trends with trend line and moving averages"""
+    if metric not in df.columns:
+        return
+    
+    fig = go.Figure()
+    
+    # Add actual values
+    fig.add_trace(go.Scatter(
+        x=df['date'],
+        y=df[metric],
+        name=title,
+        line=dict(color=color, width=2),
+        mode='lines+markers'
+    ))
+    
+    # Add 7-day moving average
+    if len(df) >= 7:
+        df['7_day_ma'] = df[metric].rolling(7).mean()
+        fig.add_trace(go.Scatter(
+            x=df['date'],
+            y=df['7_day_ma'],
+            name='7-Day MA',
+            line=dict(color='orange', width=2, dash='dot')
+        ))
+    
+    # Add 30-day moving average if we have enough data
+    if len(df) >= 30:
+        df['30_day_ma'] = df[metric].rolling(30).mean()
+        fig.add_trace(go.Scatter(
+            x=df['date'],
+            y=df['30_day_ma'],
+            name='30-Day MA',
+            line=dict(color='purple', width=2, dash='dot')
+        ))
+    
+    fig.update_layout(
+        title=f'{title} - Historical Trend',
+        xaxis_title='Date',
+        yaxis_title=title,
+        hovermode='x unified',
+        showlegend=True
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+
 def main():
     st.set_page_config(page_title="FII Analysis Dashboard", layout="wide")
     
     st.title("Foreign Institutional Investors (FII) Analysis Dashboard")
     st.markdown("Analyzing FII activities in Indian markets across cash, futures, and options segments")
     
-    # Load and process data
-    raw_data = load_data()
+    # Load data with progress indicator
+    with st.spinner("Loading FII/DII data from Sensibull API..."):
+        raw_data = load_data()
+    
+    if raw_data is None:
+        st.error("Failed to load data. Please try again later.")
+        return
+    
+    # Display last updated time
+    if 'last_updated' in raw_data:
+        st.caption(f"Last updated: {raw_data['last_updated']}")
+    
     df = process_data(raw_data)
     
-    # Date range selector - ensure we have datetime.date objects for comparison
+    if df.empty:
+        st.warning("No data available for the selected period.")
+        return
+    
+    # Date range selector
     min_date = df['date'].min().date()
     max_date = df['date'].max().date()
     
@@ -258,14 +207,12 @@ def main():
     with col2:
         end_date = st.date_input("End date", max_date, min_value=min_date, max_value=max_date)
     
-    # Convert selected dates to datetime64[ns] for comparison with DataFrame
+    # Filter the DataFrame
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
-    
-    # Filter the DataFrame
     filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
     
-    # Overview metrics with existence checks
+    # Overview metrics
     st.subheader("Key Metrics")
     
     col1, col2, col3, col4 = st.columns(4)
@@ -274,37 +221,48 @@ def main():
             latest_fii_net = filtered_df['fii_cash_net'].iloc[-1]
             trend = "↑" if latest_fii_net > 0 else "↓"
             col1.metric("Latest FII Net (Cash)", f"{latest_fii_net:,.2f} Cr", trend)
-        else:
-            col1.metric("Latest FII Net (Cash)", "N/A")
     
     with col2:
         if 'dii_cash_net' in filtered_df.columns and len(filtered_df) > 0:
             latest_dii_net = filtered_df['dii_cash_net'].iloc[-1]
             trend = "↑" if latest_dii_net > 0 else "↓"
             col2.metric("Latest DII Net (Cash)", f"{latest_dii_net:,.2f} Cr", trend)
-        else:
-            col2.metric("Latest DII Net (Cash)", "N/A")
     
     with col3:
         if 'nifty' in filtered_df.columns and len(filtered_df) > 0:
             latest_nifty = filtered_df['nifty'].iloc[-1]
             nifty_change = filtered_df['nifty_change_percent'].iloc[-1]
             col3.metric("Nifty 50", f"{latest_nifty:,.2f}", f"{nifty_change:.2f}%")
-        else:
-            col3.metric("Nifty 50", "N/A")
     
     with col4:
         if 'banknifty' in filtered_df.columns and len(filtered_df) > 0:
             latest_banknifty = filtered_df['banknifty'].iloc[-1]
             banknifty_change = filtered_df['banknifty_change_percent'].iloc[-1]
             col4.metric("Bank Nifty", f"{latest_banknifty:,.2f}", f"{banknifty_change:.2f}%")
-        else:
-            col4.metric("Bank Nifty", "N/A")
     
-    # Cash Market Analysis with existence checks
+    # Historical Trends Section
+    st.subheader("Historical Trends")
+    
+    trend_col1, trend_col2 = st.columns(2)
+    
+    with trend_col1:
+        if 'fii_cash_net' in df.columns:
+            show_historical_trends(df, 'fii_cash_net', 'FII Net Investment (Cash)', 'blue')
+        
+        if 'fii_future_net_oi' in df.columns:
+            show_historical_trends(df, 'fii_future_net_oi', 'FII Futures Net OI (Quantity)', 'orange')
+    
+    with trend_col2:
+        if 'dii_cash_net' in df.columns:
+            show_historical_trends(df, 'dii_cash_net', 'DII Net Investment (Cash)', 'green')
+        
+        if 'fii_option_overall_net_oi' in df.columns:
+            show_historical_trends(df, 'fii_option_overall_net_oi', 'FII Options Net OI', 'red')
+    
+    # Cash Market Analysis
     st.subheader("Cash Market Activity")
     
-    if all(col in filtered_df.columns for col in ['fii_cash_buy', 'fii_cash_sell', 'fii_cash_net']) and len(filtered_df) > 0:
+    if all(col in filtered_df.columns for col in ['fii_cash_buy', 'fii_cash_sell', 'fii_cash_net']):
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=filtered_df['date'],
@@ -335,24 +293,20 @@ def main():
         )
         
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning("FII cash market data not available")
     
-    # FII vs DII Comparison with existence checks
+    # FII vs DII Comparison
     st.subheader("FII vs DII Cash Activity")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        if all(col in filtered_df.columns for col in ['fii_cash_net', 'dii_cash_net']) and len(filtered_df) > 0:
+        if all(col in filtered_df.columns for col in ['fii_cash_net', 'dii_cash_net']):
             fig = px.line(filtered_df, x='date', y=['fii_cash_net', 'dii_cash_net'],
                          title='FII vs DII Net Investment (₹ Cr)')
             st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("FII/DII cash market comparison data not available")
     
     with col2:
-        # Create a summary table of actions with existence checks
+        # Create a summary table of actions
         latest_data = filtered_df.iloc[-1] if len(filtered_df) > 0 else {}
         summary_data = {
             'Metric': ['Cash Market', 'Futures (Qty)', 'Futures (Amt)', 'Options'],
@@ -384,13 +338,13 @@ def main():
         summary_df = pd.DataFrame(summary_data)
         st.dataframe(summary_df, hide_index=True, use_container_width=True)
     
-    # Derivatives Analysis with existence checks
+    # Derivatives Analysis
     st.subheader("Derivatives Activity")
     
     tab1, tab2, tab3 = st.tabs(["Futures (Quantity)", "Futures (Amount)", "Options"])
     
     with tab1:
-        if all(col in filtered_df.columns for col in ['fii_future_net_oi', 'dii_future_net_oi']) and len(filtered_df) > 0:
+        if all(col in filtered_df.columns for col in ['fii_future_net_oi', 'dii_future_net_oi']):
             fig = go.Figure()
             fig.add_trace(go.Bar(
                 x=filtered_df['date'],
@@ -411,19 +365,15 @@ def main():
                 barmode='group'
             )
             st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("Futures quantity data not available")
     
     with tab2:
-        if 'fii_future_net_oi_amt' in filtered_df.columns and len(filtered_df) > 0:
+        if 'fii_future_net_oi_amt' in filtered_df.columns:
             fig = px.line(filtered_df, x='date', y='fii_future_net_oi_amt',
                          title='FII Futures Net OI (Amount in ₹ Cr)')
             st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("Amount-wise futures data not available")
     
     with tab3:
-        if all(col in filtered_df.columns for col in ['fii_option_overall_net_oi', 'dii_option_overall_net_oi']) and len(filtered_df) > 0:
+        if all(col in filtered_df.columns for col in ['fii_option_overall_net_oi', 'dii_option_overall_net_oi']):
             fig = go.Figure()
             fig.add_trace(go.Bar(
                 x=filtered_df['date'],
@@ -444,13 +394,11 @@ def main():
                 barmode='group'
             )
             st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("Options data not available")
     
-    # Market Correlation Analysis with existence checks
+    # Market Correlation Analysis
     st.subheader("FII Activity vs Market Performance")
     
-    if all(col in filtered_df.columns for col in ['fii_cash_net', 'nifty']) and len(filtered_df) > 0:
+    if all(col in filtered_df.columns for col in ['fii_cash_net', 'nifty']):
         fig = go.Figure()
         
         # Add FII net cash as bars
@@ -490,8 +438,6 @@ def main():
         )
         
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning("FII and market data not available for correlation analysis")
     
     # Raw data view
     st.subheader("Raw Data")
