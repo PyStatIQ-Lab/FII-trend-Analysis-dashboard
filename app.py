@@ -12,8 +12,6 @@ API_URL = "https://oxide.sensibull.com/v1/compute/cache/fii_dii_daily"
 CACHE_EXPIRY_DAYS = 1  # Refresh cache every day
 
 # Load data function with caching
-@st.cache_data(ttl=timedelta(days=CACHE_EXPIRY_DAYS).clear()
-# Load data function with caching
 @st.cache_data(ttl=timedelta(days=CACHE_EXPIRY_DAYS))
 def load_data():
     try:
