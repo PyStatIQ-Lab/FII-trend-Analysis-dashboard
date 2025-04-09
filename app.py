@@ -123,7 +123,7 @@ def process_data(raw_data):
     
     df = pd.DataFrame(records)
     df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values('date').reset_index(drop=True)
+    df = df.sort_values('date', ascending=True).reset_index(drop=True)  # Sort by date ascending
     
     return df
 
@@ -131,6 +131,8 @@ def show_historical_trends(df, metric, title, color):
     """Show historical trends with trend line and moving averages"""
     if metric not in df.columns:
         return
+    
+    df = df.sort_values('date', ascending=True)  # Ensure dates are sorted
     
     fig = go.Figure()
     
@@ -207,10 +209,10 @@ def main():
     with col2:
         end_date = st.date_input("End date", max_date, min_value=min_date, max_value=max_date)
     
-    # Filter the DataFrame
+    # Filter and sort the DataFrame
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
-    filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+    filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)].sort_values('date', ascending=True)
     
     # Overview metrics
     st.subheader("Key Metrics")
@@ -263,6 +265,7 @@ def main():
     st.subheader("Cash Market Activity")
     
     if all(col in filtered_df.columns for col in ['fii_cash_buy', 'fii_cash_sell', 'fii_cash_net']):
+        filtered_df = filtered_df.sort_values('date', ascending=True)
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=filtered_df['date'],
@@ -301,6 +304,7 @@ def main():
     
     with col1:
         if all(col in filtered_df.columns for col in ['fii_cash_net', 'dii_cash_net']):
+            filtered_df = filtered_df.sort_values('date', ascending=True)
             fig = px.line(filtered_df, x='date', y=['fii_cash_net', 'dii_cash_net'],
                          title='FII vs DII Net Investment (₹ Cr)')
             st.plotly_chart(fig, use_container_width=True)
@@ -313,7 +317,7 @@ def main():
             'FII Action': [
                 latest_data.get('fii_cash_action', 'N/A'),
                 latest_data.get('fii_future_action', 'N/A'),
-                "N/A",  # No direct action field for amount-wise
+                "N/A",
                 latest_data.get('fii_option_action', 'N/A')
             ],
             'FII View': [
@@ -345,6 +349,7 @@ def main():
     
     with tab1:
         if all(col in filtered_df.columns for col in ['fii_future_net_oi', 'dii_future_net_oi']):
+            filtered_df = filtered_df.sort_values('date', ascending=True)
             fig = go.Figure()
             fig.add_trace(go.Bar(
                 x=filtered_df['date'],
@@ -368,12 +373,14 @@ def main():
     
     with tab2:
         if 'fii_future_net_oi_amt' in filtered_df.columns:
+            filtered_df = filtered_df.sort_values('date', ascending=True)
             fig = px.line(filtered_df, x='date', y='fii_future_net_oi_amt',
                          title='FII Futures Net OI (Amount in ₹ Cr)')
             st.plotly_chart(fig, use_container_width=True)
     
     with tab3:
         if all(col in filtered_df.columns for col in ['fii_option_overall_net_oi', 'dii_option_overall_net_oi']):
+            filtered_df = filtered_df.sort_values('date', ascending=True)
             fig = go.Figure()
             fig.add_trace(go.Bar(
                 x=filtered_df['date'],
@@ -395,22 +402,23 @@ def main():
             )
             st.plotly_chart(fig, use_container_width=True)
     
-    # Market Correlation Analysis
+    # Market Correlation Analysis - Corrected version
     st.subheader("FII Activity vs Market Performance")
     
     if all(col in filtered_df.columns for col in ['fii_cash_net', 'nifty']):
+        filtered_df = filtered_df.sort_values('date', ascending=True)
+        
         fig = go.Figure()
         
-        # Add FII net cash as bars
+        # Add FII net cash as bars (primary y-axis)
         fig.add_trace(go.Bar(
             x=filtered_df['date'],
             y=filtered_df['fii_cash_net'],
             name='FII Net (Cash)',
-            marker_color='rgba(55, 128, 191, 0.7)',
-            yaxis='y'
+            marker_color='rgba(55, 128, 191, 0.7)'
         ))
         
-        # Add Nifty as a line on secondary y-axis
+        # Add Nifty as a line (secondary y-axis)
         fig.add_trace(go.Scatter(
             x=filtered_df['date'],
             y=filtered_df['nifty'],
@@ -432,7 +440,8 @@ def main():
                 titlefont=dict(color='red'),
                 tickfont=dict(color='red'),
                 overlaying='y',
-                side='right'
+                side='right',
+                anchor='x'
             ),
             hovermode='x unified'
         )
@@ -441,7 +450,7 @@ def main():
     
     # Raw data view
     st.subheader("Raw Data")
-    st.dataframe(filtered_df, use_container_width=True)
+    st.dataframe(filtered_df.sort_values('date', ascending=True), use_container_width=True)
 
 if __name__ == "__main__":
     main()
