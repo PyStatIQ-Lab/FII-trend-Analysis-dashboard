@@ -396,50 +396,51 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
     
     # Market Correlation Analysis
-        # Market Correlation Analysis
-    st.subheader("FII Activity vs Market Performance")
+st.subheader("FII Activity vs Market Performance")
+
+if all(col in filtered_df.columns for col in ['fii_cash_net', 'nifty']):
+    # Ensure dates are sorted in ascending order (oldest to newest)
+    filtered_df = filtered_df.sort_values('date', ascending=True)
     
-    if all(col in filtered_df.columns for col in ['fii_cash_net', 'nifty']):
-        fig = go.Figure()
-        
-        # Add FII net cash as bars
-        fig.add_trace(go.Bar(
-            x=filtered_df['date'],
-            y=filtered_df['fii_cash_net'],
-            name='FII Net (Cash)',
-            marker_color='rgba(55, 128, 191, 0.7)',
-            yaxis='y'
-        ))
-        
-        # Add Nifty as a line on secondary y-axis
-        fig.add_trace(go.Scatter(
-            x=filtered_df['date'],
-            y=filtered_df['nifty'],
-            name='Nifty 50',
-            line=dict(color='red', width=2),
-            yaxis='y2'
-        ))
-        
-        fig.update_layout(
-            title='FII Net Investment vs Nifty 50',
-            xaxis_title='Date',
-            yaxis=dict(
-                title='FII Net Investment (₹ Cr)',
-                titlefont=dict(color='blue'),
-                tickfont=dict(color='blue'),
-                side='left'
-            ),
-            yaxis2=dict(
-                title='Nifty 50',
-                titlefont=dict(color='red'),
-                tickfont=dict(color='red'),
-                overlaying='y',
-                side='right'
-            ),
-            hovermode='x unified'
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
+    fig = go.Figure()
+    
+    # Add FII net cash as bars
+    fig.add_trace(go.Bar(
+        x=filtered_df['date'],
+        y=filtered_df['fii_cash_net'],
+        name='FII Net (Cash)',
+        marker_color='rgba(55, 128, 191, 0.7)'
+    ))
+    
+    # Add Nifty as a line on secondary y-axis
+    fig.add_trace(go.Scatter(
+        x=filtered_df['date'],
+        y=filtered_df['nifty'],
+        name='Nifty 50',
+        line=dict(color='red', width=2),
+        yaxis='y2'
+    ))
+    
+    fig.update_layout(
+        title='FII Net Investment vs Nifty 50',
+        xaxis_title='Date',
+        yaxis=dict(
+            title='FII Net Investment (₹ Cr)',
+            titlefont=dict(color='blue'),
+            tickfont=dict(color='blue')
+        ),
+        yaxis2=dict(
+            title='Nifty 50',
+            titlefont=dict(color='red'),
+            tickfont=dict(color='red'),
+            overlaying='y',
+            side='right'
+        ),
+        hovermode='x unified'
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
     # Raw data view
     st.subheader("Raw Data")
     st.dataframe(filtered_df, use_container_width=True)
