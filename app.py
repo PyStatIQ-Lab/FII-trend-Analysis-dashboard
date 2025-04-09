@@ -396,6 +396,7 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
     
     # Market Correlation Analysis
+        # Market Correlation Analysis
     st.subheader("FII Activity vs Market Performance")
     
     if all(col in filtered_df.columns for col in ['fii_cash_net', 'nifty']):
@@ -425,7 +426,8 @@ def main():
             yaxis=dict(
                 title='FII Net Investment (₹ Cr)',
                 titlefont=dict(color='blue'),
-                tickfont=dict(color='blue')
+                tickfont=dict(color='blue'),
+                side='left'
             ),
             yaxis2=dict(
                 title='Nifty 50',
@@ -438,7 +440,6 @@ def main():
         )
         
         st.plotly_chart(fig, use_container_width=True)
-    
     # Raw data view
     st.subheader("Raw Data")
     st.dataframe(filtered_df, use_container_width=True)
