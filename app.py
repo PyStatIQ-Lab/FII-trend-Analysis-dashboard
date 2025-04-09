@@ -396,9 +396,9 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
     
     # Market Correlation Analysis
-st.subheader("FII Activity vs Market Performance")
+   st.subheader("FII Activity vs Market Performance")
 
-if all(col in filtered_df.columns for col in ['fii_cash_net', 'nifty']):
+   if all(col in filtered_df.columns for col in ['fii_cash_net', 'nifty']):
     # Ensure dates are sorted in ascending order (oldest to newest)
     filtered_df = filtered_df.sort_values('date', ascending=True)
     
